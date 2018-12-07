@@ -1,13 +1,29 @@
-# Notes
+## Notes
 
-# Todos
+Getting started
+Open sublime
+3 pane layout
+Use ipython after activating pipenv 
+
+
+```sh
+pipenv shell
+ipython
+```
+
+## Todos
 
 - [ ] @TODO: (2018-12-07)  set up method to dockerise a notebook; plan to use a dockerised notebook environment to manage python dependencies
 
 
-# Log
+## Log
 
-2018-12-06
+### 2018-12-07
+git init
+pipenv shell
+
+
+### 2018-12-06
 created folder on GAE with relevant structure, data and docs
 
 
