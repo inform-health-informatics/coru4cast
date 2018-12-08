@@ -7,8 +7,16 @@ assert df_raw.shape == (894887, 14)
 
 # Data dictionary
 # ===============
+# label up columns
+df_raw.head()
 
+NHSDD_AdmissionMethod = pd.read_csv('data_raw/admission_lookup.csv')
+NHSDD_AdmissionMethod[['Value', 'Type', 'Meaning']]
+
+UCLHDD_Wards = pd.read_csv('data_raw/wards_lookup.csv')
+UCLHDD_Wards.head()
 df_raw.columns
+
 # AdmissionMethodCode
 # -------------------
 
@@ -50,6 +58,10 @@ dict_sitecode = {'RRV03': 'UCLH'}
 # WardCode
 # --------
 df_raw['WardCode'].head()
+df_raw['WardCode'] = df_raw['WardCode'].str.lower()
+UCLHDD_Wards['WardCode'] = UCLHDD_Wards['WardCode'].str.lower()
+dft = pd.merge(df_raw, UCLHDD_Wards, left_on='WardCode', right_on='WardCode')
+dft['WardCode'].value_counts()
 
 # Bed
 # ---
@@ -66,8 +78,14 @@ df_raw['SubSpecialtyCode'].head()
 
 # Inspect distribition of admission types
 df_raw['AdmissionMethodCode'].head()
-
-
+R = pd.merge(df_raw,
+    NHSDD_AdmissionMethod[['Value', 'Type', 'Meaning']],
+    left_on = 'AdmissionMethodCode',
+    right_on = 'Value',
+    how = 'left'
+    )
+R.drop(['Value'], axis=1, inplace=True)
+R.groupby('Type')['Meaning'].value_counts()
 
 
 # Types of admissions
@@ -101,6 +119,29 @@ cols = [
 
 df = df[cols]
 df.rename(columns = {'Spell_pseudo':'pid'},inplace=True)
+
+
+
+
+# Merge in lookups
+# ward codes
+df = pd.merge(df, UCLHDD_Wards, left_on='WardCode', right_on='WardCode')
+df['WardCode'].value_counts()
+df.drop(['HandCleaned'], axis=1, inplace=True)
+
+# Admission types
+df = pd.merge(df,
+    NHSDD_AdmissionMethod[['Value', 'Type', 'Meaning']],
+    left_on = 'AdmissionMethodCode',
+    right_on = 'Value',
+    how = 'left'
+    )
+df.drop(['Value'], axis=1, inplace=True)
+df.rename({
+    'Type': 'AdmissionType',
+    'Meaning': 'AdmissionDefn',
+    }, axis=1, inplace=True)
+df.info()
 
 # Convert to timestamps
 df['TransferStartDate'] = pd.to_datetime(df['TransferStartDate'])
@@ -162,8 +203,34 @@ these_cols.append('TransferEndDate_L1')
 df['TransferGap'] = df['TransferStartDate'] - df['TransferEndDate_L1']
 these_cols.append('TransferGap')
 df[these_cols].head()
+
 df.groupby('TransferType')['TransferGap'].describe()
 
-# - [ ] @TODO: (2018-12-07) @resume
+
 # now label up episodes with transfer gaps and inspect
+dft = df.groupby('pid')['TransferGap'].max().to_frame()
+dft.columns = ['TransferGapMax']
+df = pd.merge(df,dft, left_on='pid', right_index=True, how='left')
+df.info()
+these_cols = ['pid', 'TransferType', 'TransferNumber', 'WardCode', 'Bed', 'TransferStartDate', 'TransferEndDate', 'TransferGap']
+
+# inspect: some of this does not make sense
+df[df['TransferGapMax'] > pd.Timedelta('0 seconds') ][these_cols].head(30)
+
+# count what proportion of visits have problems with non-contiguous or overlapping spells
+mask = df['TransferGapMax'] > pd.Timedelta('0 seconds')
+mask.value_counts()
+df[mask]['pid'].nunique()
+
+# - [ ] @TODO: (2018-12-07) @fixme: for now just dropping these episodes
+# proposed rule for correcting
+# where previous episode overlaps with subsequent then replace transfer time with subsequent
+# where previous episode and subsequnet are not contiguous then forward fill from previous
+df = df[mask == False]
+df.shape
+df.drop(['TransferEndDate_L1', 'TransferGapMax', 'TransferGap'],
+    axis=1, inplace=True)
+df.info()
+
+df.to_csv('data/transfers.csv')
 
