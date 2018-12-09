@@ -68,6 +68,8 @@ df.loc[df.TransferType == 'D', 'WardCode'] = 'discharged'
 dft = df
 dft = dft[dft['TransferNumber'] <= 5]
 dft.shape
+# - [ ] @NOTE: (2018-12-09) dropped the dedup since not a problem now only
+#   looking at ward level transfers
 # these_cols = ['eid', 'TransferNumber', 'TransferStartDate', 'TransferEndDate']
 # dups = dft.duplicated(subset=these_cols)
 # dft = dft[dups == False]
