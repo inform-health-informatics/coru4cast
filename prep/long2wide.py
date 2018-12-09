@@ -77,4 +77,33 @@ R = dft.pivot(
     columns='TransferNumber',
     values=['TransferStartDate', 'TransferEndDate', 'WardCode'])
 R.shape
-R[9100:9120]
+R.columns.values
+R.columns = [col[0] + '_' + str(col[1]) for col in R.columns.values]
+
+# R[9100:9120]
+# R.columns.levels
+# R.columns.labels
+
+# Now merge key columns on to R(ESULT)
+maskCol = ['eid', 'AdmissionMethodCode', 'AdmissionType', 'AdmissionDefn']
+dfm = df[maskCol].drop_duplicates()
+
+R = pd.merge(R, dfm, left_index = True, right_on = 'eid', how='left')
+
+R.info()
+R.head()
+
+# Reorder
+col_order = ['WardCode', 'TransferStartDate', 'TransferEndDate']
+X = list(R.columns.values)
+Y = [i for i in X if '_' in i]
+Y.sort(key = lambda x: col_order.index(x[:-2]))
+Y.sort(key = lambda x: x[-1])
+X = [i for i in X if i not in Y]
+X.extend(Y)
+
+R = R[X]
+R.head()
+
+# Save as CSV without row names (index)
+R.to_csv('data/transfers_wide5.csv', index=False)
