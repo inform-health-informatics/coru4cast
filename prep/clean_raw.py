@@ -89,10 +89,9 @@ R.groupby('Type')['Meaning'].value_counts()
 
 
 # Types of admissions
-df[df['TransferType'] == 'A'].groupby('AdmissionMethodCode')['AdmissionMethodCode'].agg(['count'])
-wards = df.groupby('WardCode')['AdmissionMethodCode'].agg(['count'])
+df_raw[df_raw['TransferType'] == 'A'].groupby('AdmissionMethodCode')['AdmissionMethodCode'].agg(['count'])
+wards = df_raw.groupby('WardCode')['AdmissionMethodCode'].agg(['count'])
 # wards.to_clipboard(sep='\t')
-df.shape
 
 
 
@@ -119,8 +118,41 @@ cols = [
 
 df = df[cols]
 df.rename(columns = {'Spell_pseudo':'pid'},inplace=True)
+# Convert to timestamps
+df['TransferStartDate'] = pd.to_datetime(df['TransferStartDate'])
+df['TransferEndDate'] = pd.to_datetime(df['TransferEndDate'])
+df.info()
+df['pid'].nunique()
 
+# Firstly extract an episode identifier: use the initial admit date
+# df = df[['pid', 'TransferType', 'TransferNumber', 'TransferStartDate']][:100]
+df = df.sort_values(['pid', 'TransferStartDate', 'TransferNumber'])
+df['AdmitDate'] = pd.to_datetime(np.nan)
+mask = df['TransferType'] == 'A'
+df['AdmitDate'][mask] = df[mask]['TransferStartDate']
+df['AdmitDate'] = df['AdmitDate'].fillna(method='ffill')
 
+# Enumerate groups within groups
+# https://stackoverflow.com/a/50141591/992999
+df['episode'] = df.groupby(['pid'])['AdmitDate'].transform(
+        lambda x: pd.factorize(x, sort=True)[0] + 1)
+df.sort_values(['pid', 'TransferStartDate', 'TransferNumber'])
+df['id'] = df.groupby('pid').ngroup()
+df['eid'] = df.groupby(['pid', 'episode']).ngroup()
+# Demonstrate there are duplicates
+df['episode'].value_counts()
+df['id'].nunique()
+df['eid'].nunique()
+
+# Delete the original id
+df.drop(['pid'], axis=1, inplace=True)
+df.rename({'id':'pid'}, axis=1, inplace=True)
+# Reorder columns
+df.columns
+df = df[['SiteCode', 'pid', 'eid', 'episode', 'FacilityCode', 'AdmissionMethodCode', 'TransferType',
+       'TransferNumber', 'TransferStartDate', 'TransferEndDate', 'WardCode',
+       'Bed']]
+df.columns
 
 
 # Merge in lookups
@@ -143,13 +175,9 @@ df.rename({
     }, axis=1, inplace=True)
 df.info()
 
-# Convert to timestamps
-df['TransferStartDate'] = pd.to_datetime(df['TransferStartDate'])
-df['TransferEndDate'] = pd.to_datetime(df['TransferEndDate'])
-df.info()
 
 # Appropriate sorting
-df = df.sort_values(['pid', 'SiteCode', 'TransferNumber'])
+df = df.sort_values(['pid', 'episode', 'SiteCode', 'TransferNumber'])
 df.head()
 
 # Now label each pid with min tranfer numbers
